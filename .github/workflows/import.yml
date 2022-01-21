@@ -1,0 +1,49 @@
+on:
+  workflow_dispatch:
+    inputs:
+      adoProject:
+        description: Source Azure DevOps project to import into this GitHub org
+        required: true
+      adoOrg:
+        description: URL of parent org for source Azure DevOps project
+        required: true
+      githubOrg:
+        description: Target GitHub org to import into (defaults to current org)
+        required: false
+      githubTeamName:
+        description: Github team for maintaining repos
+        required: false
+
+name: Azure DevOps Project Import
+
+jobs:
+  import:
+    name: Azure DevOps Project Import
+    runs-on: ubuntu-latest
+    container: node:17.4.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Determine target org
+        run: |
+          if [[ "${{ github.event.inputs.githubOrg }}" != "" ]]; then
+            echo "GITHUB_ORG=${{ github.event.inputs.githubOrg }}" >> $GITHUB_ENV
+          else
+            echo "GITHUB_ORG=${{ github.repository_owner }}" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Install and build
+        run: |
+          npm install --dev
+          npm run build
+
+      - name: Run import
+        run: node lib/index.js
+        env:
+          ADO_ORG:  ${{ github.event.inputs.adoOrg }}
+          ADO_PROJECT_NAME: ${{ github.event.inputs.adoProject }}
+          AZURE_PERSONAL_ACCESS_TOKEN: ${{ secrets.ADO_IMPORT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_IMPORT_PAT }}
+          GITHUB_TEAM_NAME: ${{ github.event.inputs.githubTeamName }}
